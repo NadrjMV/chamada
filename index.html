@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cariominas F.C. - Gestão Profissional</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- Babel para JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@300;400;600;700&family=Inter:wght@300;400;600;700&display=swap');
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc;
+            padding-bottom: 80px;
+        }
+
+        /* Tipografia Esportiva para Carteirinha */
+        .font-sport { font-family: 'Chakra Petch', sans-serif; }
+
+        /* Scrollbar */
+        .tabs-scroll::-webkit-scrollbar { height: 6px; }
+        .tabs-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
+        .tabs-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+
+        /* Blur de segurança */
+        .restricted-blur {
+            color: transparent;
+            text-shadow: 0 0 10px rgba(0,0,0,0.5);
+            user-select: none;
+            cursor: not-allowed;
+        }
+
+        /* Animações */
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        .slide-up { animation: slideUp 0.3s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+        /* Checkbox Customizado */
+        .custom-checkbox {
+            appearance: none;
+            background-color: #fff;
+            margin: 0;
+            font: inherit;
+            color: currentColor;
+            width: 1.15em;
+            height: 1.15em;
+            border: 2px solid #cbd5e1;
+            border-radius: 0.25em;
+            display: grid;
+            place-content: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .custom-checkbox::before {
+            content: "";
+            width: 0.65em;
+            height: 0.65em;
+            transform: scale(0);
+            transition: 120ms transform ease-in-out;
+            box-shadow: inset 1em 1em white;
+            transform-origin: center;
+            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
+        }
+        .custom-checkbox:checked { background-color: #059669; border-color: #059669; }
+        .custom-checkbox:checked::before { transform: scale(1); }
+
+        /* --- IMPRESSÃO --- */
+        @media print {
+            @page { size: A4 landscape; margin: 5mm; }
+            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; padding: 0 !important; }
+            .no-print { display: none !important; }
+            
+            /* Se estiver imprimindo carteirinha, esconde lista e mostra APENAS a carteirinha */
+            body.printing-card .print-area { display: none !important; }
+            body.printing-card .card-print-area { 
+                display: flex !important; 
+                position: absolute; 
+                top: 0; left: 0; 
+                width: 100%; height: 100%; 
+                align-items: center; justify-content: center;
+                z-index: 9999;
+                background: white;
+            }
+            
+            /* Se for lista normal */
+            body:not(.printing-card) .print-area { display: block !important; }
+            body:not(.printing-card) .card-print-area { display: none !important; }
+
+            /* Estilos de Tabela para Impressão */
+            .print-table { width: 100%; border-collapse: collapse; font-family: 'Arial', sans-serif; font-size: 11px; margin-top: 5px; }
+            .print-table th, .print-table td { border: 1px solid black; padding: 2px 4px; height: 22px; text-align: center; white-space: nowrap; }
+            .col-num { width: 30px; font-weight: bold; }
+            .col-name { text-align: left !important; padding-left: 5px !important; width: 350px; text-transform: uppercase; }
+            .print-header-grid { display: grid; grid-template-columns: 80px 1fr 80px; align-items: center; border-bottom: 1px solid transparent; margin-bottom: 5px; }
+            .print-logo-img { width: 70px; height: auto; object-fit: contain; }
+            .print-titles h1 { font-size: 24px; font-weight: bold; margin: 0; }
+            .print-header-box { border: 1px solid black; padding: 4px 10px; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; text-transform: uppercase; }
+        }
+
+        .print-area { display: none; }
+        /* Esconde a área de impressão da carteirinha na tela normal */
+        .card-print-area { display: none; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Firebase Imports -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, writeBatch, onSnapshot, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.firebaseModules = { 
+            initializeApp, getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut, signInAnonymously, signInWithCustomToken,
+            getFirestore, collection, doc, addDoc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, writeBatch, onSnapshot, query, orderBy 
+        };
+    </script>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- Utils & Constants ---
+        const CATEGORIES = ["Sub 07 (19/20/21)", "Sub 09 (17/18)", "Sub 11 (15/16)", "Sub 13 (13/14)", "Sub 15 (11/12)", "Sub 17 (09/10)", "Sub 20 (07/08)"];
+        const MONTHS_MAP = {'Janeiro': '01', 'Fevereiro': '02', 'Março': '03', 'Abril': '04', 'Maio': '05', 'Junho': '06', 'Julho': '07', 'Agosto': '08', 'Setembro': '09', 'Outubro': '10', 'Novembro': '11', 'Dezembro': '12'};
+        
+        // --- Firebase Init ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyD0ylbt8478W8Zb3zXQgIropIrDrk99GlU",
+            authDomain: "cariominas.firebaseapp.com",
+            projectId: "cariominas",
+            storageBucket: "cariominas.firebasestorage.app",
+            messagingSenderId: "921699103778",
+            appId: "1:921699103778:web:7ae8aee5425bbb9127067b",
+            measurementId: "G-G7JJWNKSFZ"
+        };
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'cariominas-app';
+        let db, auth;
+        try {
+            const { initializeApp, getAuth, getFirestore } = window.firebaseModules;
+            const app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+        } catch (e) { console.error("Erro Firebase", e); }
+
+        // --- Components ---
+        const Icon = ({ name, size = 18, className = "" }) => {
+            useEffect(() => { if (window.lucide) window.lucide.createIcons(); }, [name]);
+            return <i data-lucide={name} style={{ width: size, height: size }} className={className}></i>;
+        };
+
+        // Modal Wrapper (Handles Escape & Click Outside)
+        const ModalWrapper = ({ children, onClose }) => {
+            useEffect(() => {
+                const handleEsc = (e) => { if (e.key === 'Escape') onClose(); };
+                window.addEventListener('keydown', handleEsc);
+                return () => window.removeEventListener('keydown', handleEsc);
+            }, [onClose]);
+
+            return (
+                <div 
+                    className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 fade-in"
+                    onClick={(e) => { if(e.target === e.currentTarget) onClose(); }}
+                >
+                    <div className="relative w-full max-w-lg mx-auto slide-up">
+                        {children}
+                    </div>
+                </div>
+            );
+        };
+
+        // 1. LOGIN SCREEN
+        const LoginScreen = () => {
+            const [isRegister, setIsRegister] = useState(false);
+            const [email, setEmail] = useState('');
+            const [password, setPassword] = useState('');
+            const [error, setError] = useState('');
+
+            const handleSubmit = async (e) => {
+                e.preventDefault();
+                setError('');
+                const { signInWithEmailAndPassword, createUserWithEmailAndPassword, setDoc, doc } = window.firebaseModules;
+                try {
+                    if (isRegister) {
+                        const userCred = await createUserWithEmailAndPassword(auth, email, password);
+                        await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_directory', userCred.user.uid), {
+                            email: email, role: 'user', status: 'active', uid: userCred.user.uid, createdAt: new Date().toISOString()
+                        });
+                    } else {
+                        await signInWithEmailAndPassword(auth, email, password);
+                    }
+                } catch (err) { setError(err.message); }
+            };
+
+            return (
+                <div className="min-h-screen flex items-center justify-center bg-slate-900 p-4">
+                    <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
+                        <div className="flex justify-center mb-6">
+                            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 shadow-inner">
+                                <Icon name="shield-check" size={32} />
+                            </div>
+                        </div>
+                        <h2 className="text-2xl font-bold text-center text-slate-800 mb-2">{isRegister ? 'Solicitar Acesso' : 'Área Restrita'}</h2>
+                        <p className="text-center text-slate-500 mb-6 text-sm">{isRegister ? 'Aguarde aprovação após cadastro.' : 'Acesso exclusivo para comissão técnica.'}</p>
+                        {error && <div className="bg-red-50 text-red-500 p-3 rounded-lg text-sm mb-4 text-center border border-red-100">{error}</div>}
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div><label className="text-xs font-bold text-slate-400 uppercase">Email</label><input type="email" required value={email} onChange={e=>setEmail(e.target.value)} className="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" /></div>
+                            <div><label className="text-xs font-bold text-slate-400 uppercase">Senha</label><input type="password" required value={password} onChange={e=>setPassword(e.target.value)} className="w-full border border-slate-200 rounded-lg px-4 py-2 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500" /></div>
+                            <button type="submit" className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-emerald-200">{isRegister ? 'Cadastrar' : 'Entrar'}</button>
+                        </form>
+                        <button onClick={()=>setIsRegister(!isRegister)} className="w-full mt-6 text-sm text-slate-400 hover:text-emerald-600">{isRegister ? 'Já possui conta? Entrar' : 'Não tem conta? Cadastrar'}</button>
+                    </div>
+                </div>
+            );
+        };
+
+        // 2. ADMIN PANEL
+        const AdminPanel = ({ onClose, currentUserUid }) => {
+            const [users, setUsers] = useState([]);
+            const { collection, query, orderBy, onSnapshot, doc, updateDoc } = window.firebaseModules;
+
+            useEffect(() => {
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'users_directory'), orderBy('createdAt', 'desc'));
+                return onSnapshot(q, (snap) => setUsers(snap.docs.map(d => d.data())));
+            }, []);
+
+            const toggleStatus = async (uid, currentStatus) => {
+                const newStatus = currentStatus === 'blocked' ? 'active' : 'blocked';
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_directory', uid), { status: newStatus });
+            };
+
+            const updateRole = async (uid, newRole) => {
+                await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_directory', uid), { role: newRole });
+            };
+
+            return (
+                <ModalWrapper onClose={onClose}>
+                    <div className="bg-white rounded-2xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh]">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2"><Icon name="users" /> Gestão de Usuários</h3>
+                            <button onClick={onClose} className="text-slate-400 hover:text-red-500"><Icon name="x" /></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-2">
+                            <table className="w-full text-left text-sm">
+                                <thead className="text-slate-400 uppercase text-[10px] bg-slate-50 sticky top-0">
+                                    <tr>
+                                        <th className="px-4 py-2">Usuário</th>
+                                        <th className="px-4 py-2">Role</th>
+                                        <th className="px-4 py-2 text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {users.map(u => (
+                                        <tr key={u.uid} className={u.status === 'blocked' ? 'bg-red-50/50' : ''}>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium text-slate-700">{u.email}</div>
+                                                <div className="text-[10px] text-slate-400 font-mono">{u.uid.slice(0,6)}...</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {u.uid === currentUserUid ? <span className="text-xs font-bold text-emerald-600">ADMIN (Você)</span> :
+                                                <select value={u.role} onChange={(e) => updateRole(u.uid, e.target.value)} className="border border-slate-200 rounded px-2 py-1 text-xs bg-white">
+                                                    <option value="user">User</option>
+                                                    <option value="admin">Admin</option>
+                                                </select>}
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                {u.uid !== currentUserUid && (
+                                                    <button 
+                                                        onClick={() => toggleStatus(u.uid, u.status || 'active')}
+                                                        className={`text-xs px-2 py-1 rounded border ${u.status === 'blocked' ? 'bg-red-100 text-red-600 border-red-200' : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-slate-200'}`}
+                                                    >
+                                                        {u.status === 'blocked' ? 'Desbloquear' : 'Bloquear'}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </ModalWrapper>
+            );
+        };
+
+        // 3. CONFIRM DELETE MODAL
+        const DeleteModal = ({ count, onClose, onConfirm }) => (
+            <ModalWrapper onClose={onClose}>
+                <div className="bg-white rounded-2xl p-6 shadow-2xl text-center">
+                    <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 mx-auto mb-4">
+                        <Icon name="alert-triangle" size={32} />
+                    </div>
+                    <h3 className="text-xl font-bold text-slate-800 mb-2">Excluir Registro?</h3>
+                    <p className="text-slate-500 mb-6">
+                        Você está prestes a remover <strong className="text-slate-800">{count} atleta(s)</strong> permanentemente.<br/>Essa ação não pode ser desfeita.
+                    </p>
+                    <div className="flex gap-3 justify-center">
+                        <button onClick={onClose} className="px-5 py-2.5 rounded-lg border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors">Cancelar</button>
+                        <button onClick={onConfirm} className="px-5 py-2.5 rounded-lg bg-red-500 text-white font-bold hover:bg-red-600 shadow-lg shadow-red-200 transition-colors">Sim, Excluir</button>
+                    </div>
+                </div>
+            </ModalWrapper>
+        );
+
+        // 4. CARTEIRINHA MODAL (AVATAR TIPOGRÁFICO)
+        const CarteirinhaModal = ({ athlete, onClose }) => {
+            const handlePrint = () => {
+                document.body.classList.add('printing-card');
+                window.print();
+                setTimeout(() => document.body.classList.remove('printing-card'), 500);
+            };
+
+            // Gera Iniciais
+            const initials = useMemo(() => {
+                const parts = athlete.name.trim().split(' ');
+                if (parts.length === 0) return "CF";
+                if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+                return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            }, [athlete.name]);
+
+            // Gera Cor Baseado na Categoria
+            const categoryColorClass = useMemo(() => {
+                const c = athlete.category || "";
+                if (c.includes("07")) return "from-emerald-400 to-emerald-600";
+                if (c.includes("09")) return "from-blue-400 to-blue-600";
+                if (c.includes("11")) return "from-cyan-400 to-cyan-600";
+                if (c.includes("13")) return "from-violet-400 to-violet-600";
+                if (c.includes("15")) return "from-fuchsia-400 to-fuchsia-600";
+                if (c.includes("17")) return "from-rose-400 to-rose-600";
+                if (c.includes("20")) return "from-orange-400 to-orange-600";
+                return "from-slate-400 to-slate-600"; // Default
+            }, [athlete.category]);
+
+            const CardContent = ({ isPrint = false }) => (
+                <div className={`relative overflow-hidden ${isPrint ? 'w-[350px] h-[540px]' : 'w-[300px] h-[460px]'} bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-xl shadow-2xl border-4 border-yellow-500/50 flex flex-col text-white font-sport`}>
+                    {/* Background Texture */}
+                    <div className="absolute inset-0 opacity-20" style={{backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '20px 20px'}}></div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+
+                    {/* Header */}
+                    <div className="relative z-10 p-5 flex justify-between items-start">
+                        <div className="flex flex-col">
+                            <span className="text-4xl font-bold text-yellow-400 leading-none">26</span>
+                            <span className="text-[10px] uppercase tracking-widest opacity-70">Temporada</span>
+                        </div>
+                        <img src="https://i.imgur.com/Jdq0NS5.png" className="w-16 h-16 object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]" />
+                    </div>
+
+                    {/* Avatar Area (Tipográfico) */}
+                    <div className="relative z-10 mx-auto mt-2">
+                        <div className={`w-32 h-32 rounded-full border-4 border-yellow-400 bg-gradient-to-br ${categoryColorClass} flex items-center justify-center overflow-hidden shadow-lg relative group`}>
+                            {/* Initials */}
+                            <span className="font-sport text-5xl font-bold text-white tracking-tighter drop-shadow-md z-10">
+                                {initials}
+                            </span>
+                            {/* Shine effect */}
+                            <div className="absolute top-0 left-0 w-full h-1/2 bg-white/20 blur-sm transform -skew-y-12"></div>
+                        </div>
+                        <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 bg-emerald-600 px-3 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-emerald-400 shadow-lg whitespace-nowrap">
+                            Atleta Verificado
+                        </div>
+                    </div>
+
+                    {/* Info */}
+                    <div className="relative z-10 flex-1 flex flex-col items-center justify-center mt-6 text-center px-4">
+                        <h2 className="text-2xl font-bold uppercase tracking-wide text-white mb-1 drop-shadow-md">{athlete.name.split(' ')[0]}</h2>
+                        <h3 className="text-sm text-slate-400 uppercase mb-4 tracking-widest">{athlete.name.split(' ').slice(1).join(' ')}</h3>
+                        
+                        <div className="w-full h-px bg-gradient-to-r from-transparent via-yellow-500/50 to-transparent mb-4"></div>
+
+                        <div className="grid grid-cols-2 gap-4 w-full px-2">
+                            <div className="bg-white/5 rounded-lg p-2 border border-white/10 backdrop-blur-sm">
+                                <p className="text-[8px] text-yellow-400 uppercase tracking-widest mb-1">Categoria</p>
+                                <p className="text-lg font-bold">{athlete.category ? `${athlete.category.split(' ')[0]} ${athlete.category.split(' ')[1]}` : 'N/A'}</p>
+                            </div>
+                            <div className="bg-white/5 rounded-lg p-2 border border-white/10 backdrop-blur-sm">
+                                <p className="text-[8px] text-yellow-400 uppercase tracking-widest mb-1">Nascimento</p>
+                                <p className="text-lg font-bold font-mono">{athlete.birthdate}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer */}
+                    <div className="relative z-10 bg-black/40 p-3 text-center border-t border-white/5 backdrop-blur-md">
+                        <p className="text-[10px] uppercase tracking-[0.2em] text-emerald-400 font-bold">Cariominas Futebol Club</p>
+                        <p className="text-[8px] text-slate-500 mt-1">Documento Oficial de Identificação</p>
+                    </div>
+                </div>
+            );
+
+            return (
+                <ModalWrapper onClose={onClose}>
+                    <div className="bg-white rounded-xl overflow-hidden shadow-2xl relative flex flex-col items-center p-8 no-print">
+                        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                            <Icon name="id-card" className="text-emerald-600" /> Carteirinha Oficial
+                        </h2>
+                        
+                        {/* Versão Tela */}
+                        <div className="transform hover:scale-105 transition-transform duration-300">
+                            <CardContent />
+                        </div>
+
+                        <div className="mt-8 flex gap-3 w-full">
+                            <button onClick={onClose} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-lg">Fechar</button>
+                            <button onClick={handlePrint} className="flex-1 bg-slate-800 text-white font-bold py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-black shadow-lg">
+                                <Icon name="printer" size={18} /> Imprimir
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Versão Impressão (Fica escondida até o print) */}
+                    <div className="card-print-area">
+                        <div className="print-card-element scale-125"> {/* Scale up for print quality */}
+                            <CardContent isPrint={true} />
+                        </div>
+                    </div>
+                </ModalWrapper>
+            );
+        };
+
+        // --- MAIN APP ---
+        function App() {
+            // Auth State
+            const [user, setUser] = useState(null);
+            const [role, setRole] = useState(null);
+            
+            // App State
+            const [allAthletes, setAllAthletes] = useState([]); 
+            const [selectedIds, setSelectedIds] = useState(new Set()); // Bulk Selection
+            
+            // UI State
+            const [activeCategory, setActiveCategory] = useState(CATEGORIES[1]);
+            const [month, setMonth] = useState('Janeiro');
+            const [year, setYear] = useState('2026');
+            const [location, setLocation] = useState('Campo do Vasco');
+            
+            // Modals & Inputs
+            const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+            const [cardAthlete, setCardAthlete] = useState(null);
+            const [deleteTarget, setDeleteTarget] = useState(null); // ID or 'BATCH'
+            const [quickData, setQuickData] = useState({ name: '', birthdate: '', phone: '' });
+            const nameRef = useRef(null);
+
+            // --- Auth Logic ---
+            useEffect(() => {
+                if (!auth) return;
+                const { onAuthStateChanged, getDoc, doc, signOut } = window.firebaseModules;
+                return onAuthStateChanged(auth, async (u) => {
+                    if (u) {
+                        try {
+                            const userDoc = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'users_directory', u.uid));
+                            if (userDoc.exists()) {
+                                const data = userDoc.data();
+                                if (data.status === 'blocked') {
+                                    alert('Sua conta foi desativada pelo administrador.');
+                                    await signOut(auth);
+                                    setUser(null);
+                                    return;
+                                }
+                                setRole(data.role);
+                                setUser(u);
+                            } else {
+                                setRole('user');
+                                setUser(u);
+                            }
+                        } catch(e) { console.error(e); setRole('user'); setUser(u); }
+                    } else {
+                        setUser(null);
+                        setRole(null);
+                    }
+                });
+            }, []);
+
+            // --- Data & Helpers ---
+            useEffect(() => {
+                const savedPrefs = JSON.parse(localStorage.getItem('cariominas_location_prefs') || '{}');
+                setLocation(savedPrefs[activeCategory] || (parseInt(activeCategory.match(/Sub (\d+)/)?.[1] || 0) <= 13 ? 'Campo do Vasco' : 'Facesm'));
+            }, [activeCategory]);
+
+            useEffect(() => {
+                if (!user || !db) return;
+                const { collection, onSnapshot, query } = window.firebaseModules;
+                const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'athletes'));
+                return onSnapshot(q, (snap) => {
+                    const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    list.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+                    setAllAthletes(list);
+                });
+            }, [user]);
+
+            const currentAthletes = useMemo(() => {
+                const list = allAthletes.filter(a => (!a.category || a.category === activeCategory));
+                return list;
+            }, [allAthletes, activeCategory]);
+
+            // Clear selection when category changes
+            useEffect(() => { setSelectedIds(new Set()); }, [activeCategory]);
+
+            // --- Smart Validation ---
+            const handleDateInput = (val) => {
+                let v = val.replace(/\D/g, "");
+                // Prevent month > 12 logic roughly while typing
+                if (v.length >= 4) {
+                    const monthPart = parseInt(v.slice(2, 4));
+                    if (monthPart > 12) v = v.slice(0, 2); // Reset if month is invalid
+                }
+                v = v.slice(0, 8); // Max chars
+                if (v.length > 4) v = v.replace(/^(\d{2})(\d{2})(\d{1,4})/, "$1/$2/$3");
+                else if (v.length > 2) v = v.replace(/^(\d{2})(\d{1,2})/, "$1/$2");
+                setQuickData(prev => ({...prev, birthdate: v}));
+            };
+
+            const maskPhone = (v) => {
+                v = v.replace(/\D/g, "").slice(0, 11);
+                if (v.length > 10) return v.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+                if (v.length > 6) return v.replace(/^(\d{2})(\d{4})(\d{0,4})/, "($1) $2-$3");
+                if (v.length > 2) return v.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+                if (v.length > 0) return v.replace(/^(\d{0,2})/, "($1");
+                return v;
+            };
+
+            // --- Handlers ---
+            const handleQuickAdd = async (e) => {
+                if (role !== 'admin') { alert("Apenas admins podem adicionar."); return; }
+                if ((e.key === 'Enter' || e.type === 'click') && quickData.name.trim()) {
+                    const { collection, addDoc } = window.firebaseModules;
+                    try {
+                        await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'athletes'), {
+                            ...quickData, category: activeCategory, createdAt: new Date().toISOString()
+                        });
+                        setQuickData({ name: '', birthdate: '', phone: '' });
+                        if (nameRef.current) nameRef.current.focus();
+                    } catch (err) { console.error(err); }
+                }
+            };
+
+            const handleBulkDelete = async () => {
+                const { doc, writeBatch } = window.firebaseModules;
+                const batch = writeBatch(db);
+                selectedIds.forEach(id => {
+                    batch.delete(doc(db, 'artifacts', appId, 'public', 'data', 'athletes', id));
+                });
+                await batch.commit();
+                setSelectedIds(new Set());
+                setDeleteTarget(null);
+            };
+
+            const handleSingleDelete = async () => {
+                const { doc, deleteDoc } = window.firebaseModules;
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'athletes', deleteTarget));
+                setDeleteTarget(null);
+            };
+
+            const toggleSelect = (id) => {
+                const newSet = new Set(selectedIds);
+                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                setSelectedIds(newSet);
+            };
+
+            const toggleSelectAll = () => {
+                if (selectedIds.size === currentAthletes.length) setSelectedIds(new Set());
+                else setSelectedIds(new Set(currentAthletes.map(a => a.id)));
+            };
+
+            const handleLocationChange = () => {
+                const newLocation = location === 'Campo do Vasco' ? 'Facesm' : 'Campo do Vasco';
+                setLocation(newLocation);
+                const savedPrefs = JSON.parse(localStorage.getItem('cariominas_location_prefs') || '{}');
+                savedPrefs[activeCategory] = newLocation;
+                localStorage.setItem('cariominas_location_prefs', JSON.stringify(savedPrefs));
+            };
+
+            if (!user) return <LoginScreen />;
+
+            return (
+                <div className="min-h-screen relative fade-in">
+                    
+                    {/* --- MODALS --- */}
+                    {isAdminPanelOpen && <AdminPanel onClose={() => setIsAdminPanelOpen(false)} currentUserUid={user.uid} />}
+                    {cardAthlete && <CarteirinhaModal athlete={cardAthlete} onClose={() => setCardAthlete(null)} />}
+                    {deleteTarget && (
+                        <DeleteModal 
+                            count={deleteTarget === 'BATCH' ? selectedIds.size : 1} 
+                            onClose={() => setDeleteTarget(null)} 
+                            onConfirm={deleteTarget === 'BATCH' ? handleBulkDelete : handleSingleDelete} 
+                        />
+                    )}
+
+                    {/* --- MAIN UI --- */}
+                    <div className="no-print max-w-5xl mx-auto p-6">
+                        
+                        {/* Top Bar */}
+                        <div className="flex justify-between items-center mb-4 text-xs text-slate-400">
+                            <div className="flex items-center gap-2">
+                                <div className={`w-2 h-2 rounded-full ${role === 'admin' ? 'bg-emerald-500' : 'bg-slate-400'}`}></div>
+                                <span>{user.email}</span>
+                            </div>
+                            <div className="flex gap-3">
+                                {role === 'admin' && <button onClick={() => setIsAdminPanelOpen(true)} className="hover:text-emerald-600 flex items-center gap-1"><Icon name="settings" size={12} /> Gestão</button>}
+                                <button onClick={() => window.firebaseModules.signOut(auth)} className="hover:text-red-500 flex items-center gap-1"><Icon name="log-out" size={12} /> Sair</button>
+                            </div>
+                        </div>
+
+                        {/* Title & Actions */}
+                        <div className="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-2xl shadow-sm border border-slate-100 gap-4">
+                            <div>
+                                <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2"><Icon name="trophy" className="text-emerald-600" /> Cariominas F.C.</h1>
+                                <p className="text-slate-500 text-sm">Painel de Gestão • {activeCategory}</p>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => window.print()} className="bg-slate-900 text-white px-5 py-2 rounded-lg font-bold flex items-center gap-2 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 text-sm">
+                                    <Icon name="printer" size={16} /> Imprimir Chamada
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Bulk Action Bar (Floating) */}
+                        {selectedIds.size > 0 && role === 'admin' && (
+                            <div className="fixed bottom-20 left-1/2 -translate-x-1/2 bg-slate-800 text-white px-6 py-3 rounded-full shadow-2xl z-30 flex items-center gap-4 slide-up border border-slate-700">
+                                <span className="font-bold text-sm">{selectedIds.size} selecionado(s)</span>
+                                <div className="h-4 w-px bg-slate-600"></div>
+                                <button onClick={() => setDeleteTarget('BATCH')} className="text-red-400 hover:text-red-300 flex items-center gap-1 font-bold text-sm">
+                                    <Icon name="trash-2" size={16} /> Excluir Seleção
+                                </button>
+                            </div>
+                        )}
+
+                        {/* Add Bar */}
+                        {role === 'admin' && (
+                            <div className="bg-emerald-600 p-5 rounded-2xl shadow-xl shadow-emerald-200 mb-8 text-white">
+                                <div className="flex items-center gap-2 text-emerald-100 text-sm font-bold uppercase tracking-wide mb-3"><Icon name="plus-circle" size={16} /> Novo Atleta</div>
+                                <div className="flex flex-col md:flex-row gap-3">
+                                    <input ref={nameRef} placeholder="Nome Completo" value={quickData.name} onChange={e => setQuickData({...quickData, name: e.target.value})} onKeyDown={handleQuickAdd} className="flex-[2] bg-emerald-700/50 border-none rounded-xl px-4 py-3 text-white placeholder-emerald-200/50 outline-none quick-input transition-all" />
+                                    <input placeholder="DD/MM/AAAA" value={quickData.birthdate} onChange={e => handleDateInput(e.target.value)} onKeyDown={handleQuickAdd} className="flex-1 bg-emerald-700/50 border-none rounded-xl px-4 py-3 text-white placeholder-emerald-200/50 outline-none quick-input transition-all" />
+                                    <input placeholder="Telefone" value={quickData.phone} onChange={e => setQuickData({...quickData, phone: maskPhone(e.target.value)})} onKeyDown={handleQuickAdd} className="flex-1 bg-emerald-700/50 border-none rounded-xl px-4 py-3 text-white placeholder-emerald-200/50 outline-none quick-input transition-all" />
+                                    <button onClick={handleQuickAdd} className="bg-white text-emerald-700 font-bold px-6 py-3 rounded-xl hover:bg-emerald-50 active:scale-95 transition-all shadow-md">Salvar</button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Filters */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col"><label className="text-[10px] text-slate-400 font-bold uppercase">Mês</label><select value={month} onChange={e => setMonth(e.target.value)} className="font-bold text-slate-700 outline-none bg-transparent">{Object.keys(MONTHS_MAP).map(m => <option key={m}>{m}</option>)}</select></div>
+                            <div className="bg-white p-3 rounded-xl border border-slate-200 flex flex-col"><label className="text-[10px] text-slate-400 font-bold uppercase">Ano</label><input value={year} onChange={e => setYear(e.target.value)} className="font-bold text-slate-700 outline-none bg-transparent" /></div>
+                            <button onClick={handleLocationChange} className="bg-white p-3 rounded-xl border border-slate-200 flex justify-between items-center text-left hover:bg-slate-50 transition-colors"><div><label className="text-[10px] text-slate-400 font-bold uppercase block">Local</label><span className="font-bold text-emerald-600">{location}</span></div><Icon name="refresh-cw" size={14} className="text-slate-300" /></button>
+                        </div>
+
+                        {/* List */}
+                        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden min-h-[300px]">
+                            <div className="p-4 bg-slate-50/50 border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-widest flex justify-between">
+                                <span>Atletas do {activeCategory}</span>
+                                <span>{currentAthletes.length} Cadastrados</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-bold border-b border-slate-100">
+                                        <tr>
+                                            {role === 'admin' && (
+                                                <th className="px-6 py-3 w-10">
+                                                    <input type="checkbox" className="custom-checkbox" checked={currentAthletes.length > 0 && selectedIds.size === currentAthletes.length} onChange={toggleSelectAll} />
+                                                </th>
+                                            )}
+                                            <th className="px-6 py-3">Nº</th>
+                                            <th className="px-6 py-3">Nome</th>
+                                            <th className="px-6 py-3">Nascimento</th>
+                                            <th className="px-6 py-3">Telefone</th>
+                                            <th className="px-6 py-3 text-right">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {currentAthletes.map((a, i) => {
+                                            const isBday = a.birthdate && a.birthdate.split('/')[1] === MONTHS_MAP[month];
+                                            return (
+                                                <tr key={a.id} className={`hover:bg-slate-50 transition-colors group ${selectedIds.has(a.id) ? 'bg-emerald-50/50' : ''}`}>
+                                                    {role === 'admin' && (
+                                                        <td className="px-6 py-3">
+                                                            <input type="checkbox" className="custom-checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelect(a.id)} />
+                                                        </td>
+                                                    )}
+                                                    <td className="px-6 py-3 font-mono font-bold text-emerald-600 w-16">{(i+1).toString().padStart(2, '0')}</td>
+                                                    <td className="px-6 py-3 font-bold text-slate-700 uppercase flex items-center gap-2">
+                                                        {role === 'admin' ? a.name : <span className="restricted-blur">Protegido ****</span>}
+                                                        {isBday && <span title="Aniversariante!" className="bg-yellow-100 text-yellow-600 px-2 py-0.5 rounded-full text-[10px] flex items-center gap-1 animate-pulse border border-yellow-200">🎂 Parabéns</span>}
+                                                    </td>
+                                                    <td className="px-6 py-3 text-slate-500 text-sm font-mono">{a.birthdate}</td>
+                                                    <td className="px-6 py-3 text-slate-500 text-sm font-mono">{role === 'admin' ? a.phone : <span className="restricted-blur">(**) *****-****</span>}</td>
+                                                    <td className="px-6 py-3 text-right">
+                                                        {role === 'admin' && (
+                                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-all">
+                                                                <button onClick={() => setCardAthlete(a)} className="text-slate-400 hover:text-emerald-600 p-1" title="Carteirinha"><Icon name="id-card" size={18} /></button>
+                                                                <button onClick={() => setDeleteTarget(a.id)} className="text-slate-400 hover:text-red-500 p-1" title="Excluir"><Icon name="trash-2" size={18} /></button>
+                                                            </div>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {currentAthletes.length === 0 && <tr><td colSpan="6" className="p-12 text-center text-slate-400">Nenhum atleta nesta categoria.</td></tr>}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Bottom Nav */}
+                    <div className="no-print fixed bottom-0 left-0 w-full bg-white border-t border-slate-200 shadow-lg z-20">
+                        <div className="max-w-6xl mx-auto overflow-x-auto tabs-scroll">
+                            <div className="flex px-4 py-3 gap-2 min-w-max">
+                                {CATEGORIES.map(cat => (
+                                    <button key={cat} onClick={() => setActiveCategory(cat)} className={`px-4 py-2 rounded-full text-xs font-bold uppercase tracking-wide transition-all whitespace-nowrap ${activeCategory === cat ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200 scale-105' : 'bg-slate-100 text-slate-500 hover:bg-slate-200'}`}>{cat}</button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Print Area (Standard List) */}
+                    <div className="print-area">
+                        <div className="print-header-grid">
+                            <div style={{textAlign: 'left'}}><img src="https://i.imgur.com/Jdq0NS5.png" alt="Logo" className="print-logo-img" /></div>
+                            <div className="print-titles"><h1>CARIOMINAS F.C</h1><h2>Controle de frequência</h2></div>
+                            <div></div>
+                        </div>
+                        <div className="print-header-box"><span>Mês: {month} / {year}</span><span>Categoria: {activeCategory}</span><span>{location}</span></div>
+                        <table className="print-table">
+                            <thead><tr><th className="col-num">Nº</th><th className="col-name">ATLETA</th><th className="col-birth">NASCIMENTO</th>{[...Array(16)].map((_, i) => <th key={i} className="col-check"></th>)}<th className="col-phone">TELEFONE</th></tr></thead>
+                            <tbody>
+                                {currentAthletes.map((a, i) => (
+                                    <tr key={a.id}><td className="col-num">{(i+1).toString().padStart(2, '0')}-</td><td className="col-name">{a.name}</td><td className="col-birth">{a.birthdate}</td>{[...Array(16)].map((_, i) => <td key={i}></td>)}<td className="col-phone">{a.phone}</td></tr>
+                                ))}
+                                {[...Array(Math.max(0, 31 - currentAthletes.length))].map((_, idx) => (
+                                    <tr key={`empty-${idx}`}><td className="col-num">{(currentAthletes.length + idx + 1).toString().padStart(2, '0')}-</td><td className="col-name"></td><td className="col-birth"></td>{[...Array(16)].map((_, i) => <td key={i}></td>)}<td className="col-phone"></td></tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
